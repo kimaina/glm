@@ -1,0 +1,408 @@
+---
+title: "Homework 2"
+author: "Allan Kimaina"
+date: "February 22, 2018"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F)
+
+
+# load all data
+wine = read.csv("data/Wine.csv")
+bush = read.csv("data/Bush.csv")
+bloodBrain = read.csv("data/BloodBrain.csv")
+
+# clean bush
+colnames(bush)[1] <- "county" # name the 1st column using standard
+col2cvt <- 2:ncol(bush) # get all numeric columns
+bush[,col2cvt] <- lapply(bush[,col2cvt],function(x){as.numeric(gsub(",", "", x))}) # convert to numeric
+
+# clean wine
+colnames(wine)[1] <- "COUNTRY"
+
+# clean wine
+colnames(bloodBrain)[1] <- "BRAIN"
+
+```
+
+# Question 1
+
+* Using the wine data from the previous homework, create two new variables by logarithmically transforming both wine and     mortality
+
+```{r echo=FALSE}
+wine$logMORTALITY <- log(wine$MORTALITY)
+wine$logWINE <- log(wine$WINE)
+wine.model <- lm(MORTALITY~WINE, data=wine )
+wine.model.log.x <- lm( MORTALITY~logWINE, data=wine )
+wine.model.log.y <- lm( logMORTALITY~WINE, data=wine)
+wine.model.log.xy <- lm( logMORTALITY~logWINE, data=wine )
+
+```
+⦁
+* Plot mortality vs. wine; log mortality vs. wine, mortality vs. log wine and log mortality vs. log wine. Which one looks more   linear?
+
+```{r echo=FALSE}
+
+wine.model.plot = ggplot(wine, aes(y=MORTALITY, x=WINE)) +
+    geom_point(alpha = .5) +
+    geom_point(color = "blue") +
+    labs(x='WINE', y='MORTALITY',
+         title = "Mortality vs Wine")+
+   # scale_x_log10() +
+   # scale_y_log10()+
+    theme_classic()+ guides(fill=FALSE)+
+    theme(
+      axis.title = element_text( size=8),
+      axis.title.x = element_text( size=8),
+      axis.title.y = element_text( size=8)
+    )
+
+
+
+wine.model.log.x.plot=ggplot(wine, aes(y=MORTALITY, x=logWINE)) +
+    geom_point(alpha = .5) +
+    geom_point(color = "blue") +
+    labs(x='log(WINE)', y='MORTALITY',
+         title = "Mortality vs log(Wine)")+
+  
+    #scale_x_log10() +
+    #scale_y_log10()+
+    theme_classic()+ guides(fill=FALSE)+
+    theme(
+      axis.title = element_text( size=8),
+      axis.title.x = element_text( size=8),
+      axis.title.y = element_text( size=8)
+    )
+
+
+
+wine.model.log.y.plot=ggplot(wine, aes(y=logMORTALITY, x=WINE)) +
+    geom_point(alpha = .5) +
+    geom_point(color = "blue") +
+    labs(x='WINE', y='log(MORTALITY)',
+         title = "log(Mortality) vs Wine")+
+   
+   # scale_x_log10() +
+   # scale_y_log10()+
+    theme_classic()+ guides(fill=FALSE)+
+    theme(
+      axis.title = element_text( size=8),
+      axis.title.x = element_text( size=8),
+      axis.title.y = element_text( size=8)
+    )
+
+
+
+
+wine.model.log.xy.plot =ggplot(wine, aes(y=logMORTALITY, x=logWINE)) +
+    geom_point(alpha = .5) +
+    geom_point(color = "blue") +
+    labs(x='log(Wine)', y='log(Mortality)',
+         title = "log(Mortality) vs log(Wine)")+
+   
+   #scale_x_log10() +
+    #scale_y_log10()+
+    theme_classic()+ guides(fill=FALSE)+
+    theme(
+      axis.title = element_text( size=8),
+      axis.title.x = element_text( size=8),
+      axis.title.y = element_text( size=8)
+    )
+
+
+
+
+#summary(wine.model.transformed)
+
+```
+
+* ⦁Fit four linear regression models corresponding to the four plots and report the regression equation and R-squared. Which    model do you think is best?
+
+```{r eval=FALSE}
+#wine.model.transformed <- lm( log(wine$MORTALITY)~log(wine$WINE))
+
+
+plot(log(wine$WINE), log(wine$MORTALITY),
+      main= "Absolute Losses vs. Relative Losses(in%)",
+      xlab= "log(Wine Consumption)",
+      ylab= "log(Heart Attack Mortality)",
+      main= "Log Transformation Plot",
+      col= "blue", pch = 19, cex = 1, lty = "solid", lwd = 2)
+abline(wine.model.transformed,  col="red")
+
+#summary(wine.model.transformed)
+
+```
+
+* Interpret each regression model by describing the change in mortality for a given change in the predictor. Use an             increase of 10 units of wine consumption for linear wine and a doubling of wine consumption for logarithmic wine 
+  
+```{r echo=FALSE}
+wine.model.transformed <- lm( log(wine$MORTALITY)~log(wine$WINE))
+
+
+plot(log(wine$WINE), log(wine$MORTALITY),
+      main= "Absolute Losses vs. Relative Losses(in%)",
+      xlab= "log(Wine Consumption)",
+      ylab= "log(Heart Attack Mortality)",
+      main= "Log Transformation Plot",
+      col= "blue", pch = 19, cex = 1, lty = "solid", lwd = 2)
+abline(wine.model.transformed,  col="red")
+
+#summary(wine.model.transformed)
+
+```
+  
+* The datasets for the two questions may be found in the Canvas folder files inside the subfolder datasets.
+
+
+* The data in the file wine.csv (in the data sets folder on Canvas) give the average wine consumption rates (in liters per      person) and number of ischemic heart attack deaths (per 1000 men aged 55 to 64 years) for 18 industrialized countries.
+  Do these data suggest that heart disease death rates are associated with average wine consumption? If so, how can that be     described?
+
+Do any countries have substantially higher or lower death rates than others with similar wine consumption rates?
+
+Analyze the data and write a brief report that includes a summary of findings, a graphical display and a section describing the methods used to answer the questions of interest.
+
+
+
+The goal of the study is to determine the significance of the relationship between wine consumption and ischemic heart attack mortality
+
+```{r echo=FALSE}
+
+select_similar <- wine
+plot(wine$WINE, wine$MORTALITY,
+      #main= "Absolute Losses vs. Relative Losses(in%)",
+      xlab= "Wine Consumption",
+      ylab= "Heart Attack Mortality",
+      col= "blue", pch = 19, cex = 1, lty = "solid", lwd = 2)
+
+```
+
+
+
+```{r echo=F }
+wine.model = lm(MORTALITY ~ WINE, data = wine) 
+#cor(wine$WINE, wine$MORTALITY)  # calculate correlation between WINE and MORTALITY 
+```
+
+\onecolumn
+
+# Question 2: The Dramatic U.S. Presidential Election of 2000
+
+The U.S. presidential election of November 7, 2000 was one of the closest in history. As returns were counted on election night it became clear that the outcome in the state of Florida would determine the next president. At one point in the evening, television networks projected that the state was carried by the Democratic nominee, Al Gore, but a retraction of the projection followed a few hours later. Then, early in the morning of November 8, the networks projected that the Republican nominee, George W. Bush, had carried Florida and won the presidency. Gore called Bush to concede. While on route to his concession speech, though, the Florida count changed rapidly in his favor. The networks once again reversed their projection, and Gore called Bush to retract his concession. When the roughly 6 million Florida votes had been counted, Bush
+was shown to be leading by only 1,738, and the narrow margin triggered an automatic recount. The recount, completed in the evening of November 9, showed Bush's lead to be less than 400.
+Meanwhile, angry Democratic voters in Palm Beach County complained that a confusing "butterfly" lay-out ballot caused them to accidentally vote for the Reform Party candidate Pat Buchanan instead of Gore. The ballot, as illustrated in Display 8.23, listed presidential candidates on both a left-hand and a right-hand page. Voters were to register their vote by punching the circle corresponding to their choice, from the column of circles between the pages. It was suspected that since Bush's name was listed first on the left-hand page, Bush voters likely selected the first circle. Since Gore's name was listed second on the left-hand side, many voters, who already knew who they wished to vote for, did not bother examining the right-handed side and consequently selected the second circle in the column; the one actually corresponding to Buchanan. Two pieces of evidence supported this claim: Buchanan had an unusually high percentage of the vote in that county, and an unusually large number of ballots (19,000) were discarded because voters had marked two circles (possibly by inadvertently voting for Buchanan and then trying to correct the mistake by then voting for Gore).
+
+## a. The data in File Bush.xls contain the numbers of votes for Buchanan and Bush in all 67 counties in Florida. What evidence is there in the scatterplot of Display 8.25 that Buchanan received more votes than expected in Palm Beach County? Analyze the data without Palm Beach County results to obtain an equation for predicting Buchanan votes from Bush votes. Obtain a 95% prediction interval for the number of Buchanan votes in Palm Beach from this result-assuming the relationship is the same in this county as in the others. If it is assumed that Buchanan's actual count contains a number of votes intended for Gore, what can be said about the likely size of this number from the prediction interval? (Consider transformation.)
+
+
+```{r}
+
+# What evidence is there in the scatterplot of Display 8.25 that Buchanan received more votes than expected in Palm Beach County?
+# - Palm Beach County is an outlier
+
+bushPalmBeach <- bush %>%
+                      filter(county=='PALM BEACH')
+
+
+bush.withoutPalmBeach <- bush %>%
+                            filter(county!='PALM BEACH')
+
+#Analyze the data without Palm Beach County results to obtain an equation for predicting Buchanan votes from Bush votes.
+
+
+
+
+
+
+bush.withoutPalmBeach.model <- lm(buchanan2000~bush2000, data=bush.withoutPalmBeach)
+
+summary(bush.withoutPalmBeach.model)
+
+ggplot(bush.withoutPalmBeach, aes(y=buchanan2000, x=bush2000)) + 
+    geom_point(alpha = .5) + 
+    geom_point(color = "blue") +
+    stat_smooth(method = "lm",  color="red")+
+    labs(x='bush2000', y='buchanan2000',
+         title = "Linear Model: y~x")+
+    stat_poly_eq(aes(label = paste(..eq.label.., ..rr.label.., ..adj.rr.label.., sep = "~~~")), 
+                 label.x.npc = "right", label.y.npc = 0.17, geom = "text",
+                 formula =  y ~x, parse = TRUE, size = 3)+
+    stat_fit_glance(method = "lm", 
+                    method.args = list(formula = y~x),
+                    geom = "text", size = 3,
+                    label.y.npc = 0.15, label.x.npc = "right",
+                    aes(label = paste("P-value = ", signif(..p.value.., digits = 4), sep = "")))+
+   # scale_x_log10() +
+   # scale_y_log10()+
+    theme_classic()+ guides(fill=FALSE)+
+    theme(
+      axis.title = element_text( size=8),
+      axis.title.x = element_text( size=8),
+      axis.title.y = element_text( size=8)
+    )
+
+
+# Obtain a 95% prediction interval for the number of Buchanan votes in Palm Beach from this result-assuming the relationship is the same in this county as in the others.
+
+predict(bush.withoutOutlier.model,bushPalmBeach, interval = "prediction")
+
+# If it is assumed that Buchanan's actual count contains a number of votes intended for Gore, what can be said about the likely size of this number from the prediction interval? (Consider transformation.)
+
+# 3407-597.7 (2717.54)should have gone to Gor
+
+
+```
+  
+## b. One might suspect that the prediction interval can be narrowed and the validity of the procedure strengthened by incorporating other relevant predictor variables. The dataset gives the vote counts by county in Florida for Buchanan and for four other presidential candidates in 2000, along with the total vote counts in 2000, the presidential vote counts for three presidential candidates in 1996, the vote count for Buchanan in his only other campaign in Florida, the 1996 Republican primary, the registration in Buchanan's Reform party, and the total political party registration in the county.
+
+
+Analyze the data in Ex1222 and write a statistical summary predicting the number of Buchanan, votes in Palm Beach Country that were not intended for him. It would be appropriate to describe any unverifiable assumptions used in applying the prediction equation for this purpose. (Suggestion: Find a model for predicting Buchanan's 2000 vote from other variables, excluding Palm Beach County, which is listed last in the data set. Consider a transformation of all counts.)
+
+```{r}
+bush.withoutPalmBeach.allSubset.model <- lm(buchanan2000~bush2000+gore2000+nader2000+browne2000+total2000+clinton96+
+                                    dole96+perot96+buchanan96p+reform.reg+total.reg, data=bush.withoutPalmBeach)
+summary(bush.withoutPalmBeach.allSubset.model)
+#names(bush.withoutPalmBeach)
+bush.withoutPalmBeach.stepAIC.model  <- stepAIC(bush.withoutPalmBeach.allSubset.model, direction="both")
+bush.withoutPalmBeach.stepAIC.anova <- bush.withoutPalmBeach.stepAIC.model$anova 
+
+bush.withoutPalmBeach.stepAIC.anova
+
+# final model results
+bush.WPB.stepAIC.best.model <-lm(buchanan2000 ~ nader2000 + browne2000 + clinton96 + dole96 + perot96 + buchanan96p + reform.reg, data=bush.withoutPalmBeach)
+summary(bush.WPB.stepAIC.best.model)
+
+```
+
+
+\onecolumn
+# Question 3
+
+### a.⦁	Compute "Jittered" versions of-treatment, days after inoculation, and an indicator variable for females by adding small random numbers to each (uniform random numbers between -.15 and .15 work well). Or you could use the jitter function.
+⦁
+```{r}
+bloodBrain$RATIO= bloodBrain$BRAIN/bloodBrain$LIVER
+bloodBrain=bloodBrain%>%
+  mutate(
+    
+    isTreatJitter=jitter(ifelse(TREAT=='BD',1,0),amount = 0.15),
+    daysJitter=jitter(DAYS,amount = 0.15),
+    femaleJitter=jitter(ifelse(SEX=='F',1,0),amount = 0.15)
+    )
+
+bloodBrain$log_RATIO= log(bloodBrain$RATIO)
+bloodBrain$log_Time= log(bloodBrain$TIME)
+head(bloodBrain)
+
+```
+
+### b. Obtain a matrix of scatter plots for the following variables: log sacrifice time, treatment (jittered), days after inoculation (jittered), sex (jittered), and the log of the brain tumor-to-liver antibody ratio. Use the function pairs in the graphics package or scatterplotMatrix in the car package.
+
+```{r}
+pairs(bloodBrain[11:15],pch=21)
+```
+
+### c. ⦁	Obtain a matrix of the correlation coefficients among the same five variables (not jittered).
+
+```{r}
+library(ggcorrplot)
+
+data(mtcars)
+corr <- cor(bloodBrain[c(10,4,5,6,3)])
+# Second Correlogram Example
+# Correlations with significance levels
+library(Hmisc)
+#mtcars is a data frame 
+rcorr(as.matrix(bloodBrain[c(10,4,5,6,3)]))
+```
+- Transforming both predictor and response variable we get the best linear relationship
+
+### d.⦁	On the basis of this, what can be said about the relationship between the covariates (sex and days after inoculation), the response, and the design variables (treatment and sacrifice time.
+
+Time and ratio are significant
+
+### e.⦁	Fit the regression of the log response (brain tumor-to-liver antibody ratio) on an indicator variable for treatment and on sacrifice time treated as a factor with four levels (include three indicator variables, for sacrifice time == 3, 24, and 72 hours). Use the model to find the estimated mean of the log response at each of the eight treatment combinations (all combinations of the two infusions and the four sacrifice times).
+
+```{r}
+
+bloodBrain$TIMEFactor<-as.factor(bloodBrain$TIME)
+bloodBrain.model <- lm(log_RATIO~TIMEFactor+TREAT,data=bloodBrain)
+summary(bloodBrain.model)
+
+treatment <- data.frame(
+  TIMEFactor=as.factor(rep(c(.5,3,24,72),2)),
+   TREAT=as.factor(c(rep("BD",4),rep("NS",4)))
+)
+
+predicted <- cbind(treatment, 
+data.frame(predict(bloodBrain.model,treatment, interval = "prediction")))
+head(predicted)
+```
+
+### f.⦁	Let X represent log of sacrifice time. Fit the regression of the log response on an indicator variable for treatment, X, X2, and X3. Use the estimated model to find the estimated mean of the log response at each of the eight treatment combinations.
+
+```{r}
+bloodBrain.model2 <- lm(log_RATIO~log_Time+TREAT,data=bloodBrain)
+summary(bloodBrain.model2)
+augment()
+treatment2 <- data.frame(
+  log_Time=log(rep(c(.5,3,24,72),2)),
+   TREAT=as.factor(c(rep("BD",4),rep("NS",4)))
+)
+
+predicted2 <- cbind(treatment2, 
+data.frame(predict(bloodBrain.model2,treatment2, interval = "prediction")))
+head(predicted)
+```
+
+### g.⦁	Why are the answers to parts (5) and (6) the same?
+
+(part 5) model is already somewhat linear, further log transformation wouldn't change any of the predictions by much.
+```{r}
+
+```
+
+### h.⦁	Fit the regression of the log response (brain tumor-to-liver antibody ratio) on all covariates, the treatment indicator, and sacrifice time, treated as a factor with four levels (include three indicator variables, for sacrifice time == 3, 24, and 72 hours).
+
+```{r}
+model4 = lm(log_RATIO~ TREAT+ as.factor(TIME)+ SEX+ WEIGHT+ DAYS+ LOSS + TUMOR, data=bloodBrain)
+summary(model4)
+model4.df=augment(model4,bloodBrain)
+model4.df
+```
+
+### i.⦁	Obtain a set of case influence statistics, including a measure of influence, the leverage, and the studentized residua1.
+
+```{r}
+# influencial points
+model4.influence <- influence.measures(model4)
+model4.influence.df <- data.frame(model4.influence[[1]])
+
+# studentized 
+model4.studres <- studres(model4)
+
+par(mfrow=c(2,2))
+Boxplot(model4.influence.df$dffit, main="Dffit", id.method="y" )
+Boxplot(model4.influence.df$cook.d, main="Cooks Distance ", id.method="y" )
+Boxplot(model4.influence.df$hat, main="Hat", id.method="y" )
+Boxplot(model4.studres, main="studentized residual", id.method="y" )
+```
+
+### * ⦁	Discuss whether any influential observations or outliers occur with respect to this fit.
+
+```{r}
+
+```
+
+\onecolumn
+# Source Code
+
+```{r echo=T}
+ 	
+
+```
+
