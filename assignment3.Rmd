@@ -1,0 +1,472 @@
+---
+title: "Homework 3"
+author: "Allan Kimaina"
+date: "MARCH 15, 2018"
+header-includes:
+- \usepackage{pdflscape}
+- \newcommand{\blandscape}{\begin{landscape}}
+- \newcommand{\elandscape}{\end{landscape}}
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F)
+
+# loadl lm  package
+library(dplyr)
+library(car)
+library(sjPlot)
+library(sjmisc)
+library(sjlabelled)
+library(ggpubr)
+library(ggpmisc)
+library(gridExtra)
+library(stargazer)
+library(e1071)
+library(jtools)
+library(effects)
+library(multcompView)
+library(ggplot2)
+library(ggrepel)
+library(MASS)
+library(broom)
+library(ggcorrplot)
+library(leaps)
+library(relaimpo)
+library(olsrr)
+
+# load GLM packages
+library(ROCR)
+library(arm)
+library(foreign)
+library(nnet)
+library(VGAM)
+library(ordinal)
+library(ModelGood)
+library(InformationValue)
+library(rms)
+
+
+```
+\onecolumn
+
+# Question 1: Do Problem 3 in chapter 5 of Gelman and Hill.
+You are interested in how well the combined earnings of the parents in a child’s family predicts high school graduation. You are told that the probability a child graduates from high school is 27% for children whose parents earn no income and is 88% for children whose parents earn $60,000. Determine the logistic regression model that is consistent with this information. (For simplicity you may want to assume that income is measured in units of $10,000).
+
+We can find the y-intercept solving the equation $logit(0.27) = -0.9946226$. On the same way, we can find the coefficient for the earnings:
+
+$$logit(0.88) = logit(0.27) + 6*x$$
+$$1.99243 = -0.9946226 + 6*x$$
+$$x = \frac{1.99243 + 0.9946226}{6} =  0.4978421$$
+
+Substituiting X we get:
+$$Pr(y=1) = logit^{-1}(-0.9946226 +  0.4978421*x)$$
+
+
+
+
+## Plotting the equation, we obtain this:
+
+
+
+```{r results='asis', echo=FALSE, warning=FALSE}
+
+ggplot(data.frame(x=c(0, 8)), aes(x)) + 
+    stat_function(fun=function(x) invlogit(-0.9946 + 0.4978 * x)) + 
+  labs(x="earnings (in $10,000)", y="probability")
+
+```
+
+\onecolumn
+
+# Question 2: Do Problem 5 in chapter 5 of Gelman and Hill.
+In a class of 50 students, a logistic regression is performed of course grade (pass or fail) on midterm exam score (continuous values with mean 60 and standard deviation 15). The fitted model is $Pr(pass) = logit^{-1}(-24 + 0.4x)$.
+
+
+
+
+## Part A
+Graph the fitted model. Also on this graph put a scatterplot of hypothetical data consistent with the information given.
+
+```{r results='asis', echo=FALSE, warning=FALSE}
+set.seed(654)
+x1=rnorm(50,60,15)
+pr=invlogit(-24+0.4*x1)
+y1<-rbinom(50,1,pr) 
+df2 <- data.frame(
+  x1=x1,
+  y1,y1,
+  pr,pr
+)
+ggplot(data=data.frame(x=c(0,100)), aes(x=x)) + stat_function(fun=function(x) invlogit(-24 + 0.4*x))+geom_point(data=data.frame(x1,y1),aes(x1,y1))+
+    theme_classic()+ guides(fill=FALSE)
+
+
+```
+
+## Part B
+Suppose the midterm scores were transformed to have a mean of 0 and standard deviation of 1. What would be the equation of the logistic regression using these transformed scores as a predictor?
+$$Pr(pass) = logit^{-1}( \beta_0 + \beta_1x) =>original$$
+$$Pr(pass) = logit^{-1}( \hat{\beta_0} +\hat{\beta_1}\frac{x-\bar{x}}{S_{x} }) =>standardized (x_i)$$
+
+
+
+From above we find that:
+$$\hat{\beta_1} =\beta_1 * S_{x} = .4*15 =6$$
+$$\hat{\beta_0} =\beta_0 + \frac{6*60}{15 } = -24+24 =0$$
+$$Pr(pass) = logit^{-1}(0 + 6x )$$
+
+
+```{r results='asis', echo=FALSE, warning=FALSE}
+
+ggplot(data=data.frame(x=c(-4,4)), aes(x=x)) + stat_function(fun=function(x) invlogit(0 + 6*x))+theme_classic()+ guides(fill=FALSE)
+
+
+```
+
+
+## Part C
+
+Create a new predictor that is pure noise (for example, in R you can create `newpred <- rnorm(n,0,1)`). Add it to your model. How much does the deviance decrease?
+
+```{r results='asis', echo=FALSE, warning=FALSE}
+set.seed(555)
+randomNoise <- rnorm(50,0,1) # noide
+
+x1=rnorm(50,0,1)
+pr1=invlogit(6*x1)
+y1<-rbinom(50,1,pr1) 
+
+pr2=invlogit(6*x1+randomNoise)
+y2<-rbinom(50,1,pr2)
+
+df3 <- data.frame(x1=x1,y1=y1,y2=y2)
+
+
+logit.model <- glm(y1 ~ x1, data=df3, family=binomial(link="logit"))
+logit.model2 <- glm(y2 ~ x1, data=df3, family=binomial(link="logit"))
+
+deviance(logit.model)
+deviance(logit.model2)
+
+
+```
+Deviance should decrease by 1 at all if the predictor is pure noise. 
+
+\onecolumn
+
+# Question 3: Do Problem 8 in chapter 5 of Gelman and Hill. 
+
+Building a logistic regression model: the folder `rodents` contains data on rodents in a sample of New York City apartments.
+
+```{r results='asis', echo=FALSE, warning=FALSE}
+
+df <- read.table("data/rodents.txt")
+
+df$rodent2 <- as.factor(df$rodent2)
+df$race <- factor(df$race, labels=c("White (non-hispanic)", "Black (non-hispanic)", "Puerto Rican", "Other Hispanic", "Asian/Pacific Islander", "Amer-Indian/Native Alaskan", "Two or more races"))
+
+
+df$unitflr2 <- as.factor(df$unitflr2)
+df$numunits <- as.factor(df$numunits)
+df$stories <- as.factor(df$stories)
+df$extwin4_2 <- as.factor(df$extwin4_2)
+df$extflr5_2 <- as.factor(df$extflr5_2)
+df$borough <- factor(df$borough, labels=c("Bronx", "Brooklyn", "Manhattan", "Queens", "Staten Island"))
+df$cd <- as.factor(df$cd)
+df$intcrack2 <- as.factor(df$intcrack2)
+df$inthole2 <- as.factor(df$inthole2)
+df$intleak2 <- as.factor(df$intleak2)
+df$intpeel_cat <- as.factor(df$intpeel_cat)
+df$help <- as.factor(df$help)
+df$old <- as.factor(df$old)
+df$dilap <- as.factor(df$dilap)
+df$regext <- as.factor(df$regext)
+df$poverty <- as.factor(df$poverty)
+df$povertyx2 <- as.factor(df$povertyx2)
+df$housing <- factor(df$housing, labels=c("public", "rent controlled/stabilized", "owned", "other rentals"))
+df$board2 <- as.factor(df$board2)
+df$subsidy <- as.factor(df$subsidy)
+df$under6 <- as.factor(df$under6)
+dim(df)
+missingNA <- sapply(df, function(x) sum(is.na(x)))
+df <- na.omit(df)
+dim(df)
+
+
+
+```
+
+## Part A
+
+Build a logistic regression model to predict the presence of rodents (the variable `rodent2` in the dataset) given indicators for the ethnic groups (race). Combine categories as appropriate. Discuss the estimated coefficients in the model.
+
+In our first model we will use as predictor: `race` and the average of black and hispanic population in the district. 
+
+In this case there is no need to scale the variables because they all have a IQR close to 1 or are factors.
+
+
+```{r results='asis', echo=FALSE, warning=FALSE}
+
+m1 <- glm(rodent2 ~ race, data=df, family=binomial(link="logit"))
+summary(m1)
+
+```
+
+We can interpret the results as follows:
+
+* `Intercept`: an apartment where white (non-hispanic) people live, has a $logit^{-1}(-2.16) = 0.1027841 = 10.29\%$ probability of having rodent infestation in the building
+* `race`: this is the coefficient for race (on the logit scale) if any other predictor is at its average value.
+Being a factor, we can see how different races differ in terms of predicting the outcome. The base level for this factor is `White (non-hispanic)`. We can notice the coefficients for all level are positive and statistically significant, with the only expection of `Amer-Indian/Native Alaskan`. In particular, if anything else is hold at the average point, apartments where Hispanic ($\frac{1.19}{4} = 0.2975 = 29.75\%$ more likely) and Puerto Rican ($\frac{1.00}{4} = 0.25 = 25\%$ more likely) live have a higher chance to be in building infestated by roditors
+
+=====================================================================================================
+* `hispanicMean10`: a 10% increase in hispanic presence in the district is associated with a $\frac{0.19}{4} = 0.0475 = 4.75\%$ increase in probability that the building is infestated by roditors, when the race of the people living in the flat is white (non-hispanic)
+* `blackMean10`: as on the previous coefficient, a flat occupied by whites, with average hispanic presence in the district, is $\frac{0.11}{4} = 0.0275 = 2.75\%$ more likely to be infestated if the ratio of black people living in the district is 10% higher 
+
+We tried to fit a model with the interaction terms between race and hispanic or black presence in the district. As expected, the coefficients were not statistically significant. The interaction term in this case represents the difference in slope for each race linked to the increase of black and hispanic population ratio in the neighbour. Intuitivily, this says that is not much the race of the people living in the apartment to determine the conditions of the building (infestated or not infestated). Instead what really seems to make a difference is the neighbour the building is situated. Flats occupied by people of different races, in the same building should not affect the likelihood that the building is infestated.   
+
+The main conclusion we can drive from this initial model is that districts where hispanic and black people lives are generally associated with buildings more likely to be infestated by roditors.
+
+##  Part B
+
+### Add to your model some other potentially relevant predictors describing the apartment, building, and community district. Build your model using the general principles explained in Section 4.6. Discuss the coefficients for the ethnicity indicators in your model.
+
+```{r results='asis', echo=FALSE, warning=FALSE}
+df$rodent2 <- as.factor(df$rodent2)
+#df$hispanic_Mean10 <- df$hispanic_Mean * 10
+#df$black_Mean10 <- df$black_Mean * 10
+#m2 <- glm(rodent2 ~ race + hispanic_Mean10 + black_Mean10 + borough + old + housing + personrm + struct + foreign, data=df, family=binomial(link="logit"))
+class(df$rodent2)
+rodentLogitModel.all <- glm(formula=rodent2~.-sequenceno-cd, family=binomial(link="logit"),data=df)
+
+#summary(rodentLogitModel.all)
+rodentLogitModel.all.stepAIC  <- stepAIC(rodentLogitModel.all, direction="both")	
+#rodentLogitModel.all.stepAIC$anova
+
+m2 <- glm( rodent2 ~ personrm + unitflr2 + regext + totincom2 + extflr5_2 + 
+    intcrack2 + inthole2 + intleak2 + struct + help + black_Mean + 
+    help_Mean + hispanic_Mean + old_Mean + regext_Mean + dilap_Mean + 
+    intcrack2_Mean + inthole2_Mean, data=df, family=binomial(link="logit"))
+
+
+
+```
+
+* `blackMean10`: with a 1% incr of black  inc the
+
+=======================
+* `Intercept`: a public flat built after 1947, occupied by white people and owned by a non-foreign born individual, located in the Bronx borough in a discrict of average black and hispanic presence, and an average number of persons per room, has a probability of $logit^{-1}(-2.72) = 0.0618 = 6.18\%$ to be in a building infested by rats
+* `race`: at the mean level of all other predictors, any non white race has a higher probability to be associated with a building infestated by rodents. As on the previous model, Puerto Ricans, Blacks and Hispanics are more likely than other races to live in such conditions
+* `hispanicMean10`: at the mean level of all other predictors, a 10% increase in hispanic population in the district is associated with $\frac{0.13}{4} = 3.25\%$ more likelihood to live in a building infestated by rodents
+* `blackMean10`: at the mean level of all other predictors, a 10% increase in black population in the district is associated with a $\frac{0.06}{4} = 1.5\%$ higher probability to live in a building infestated by rodents
+* `borough`: Brooklyn and Manhattan have the highest probability to rats infestations. Both coefficients are positive and highly significant. Queens and Staten Island instead don't significantly differ from Bronx in this particular analysis we are performing
+* `old`: at the mean level of all other predictors, buildings built before 1947 have $\frac{0.36}{4} = 9\%$ more likely to have rats infestations
+* `housing`: holding all other predictors at their mean level, privately owned apartments are $\frac{0.26}{4} = -6.50\%$ more likely to have rodents infestations 
+* `personrm`: the higher the number of people per room, the higher the chances of rats investations in the building
+* `struct`: every other predictors hold at its mean level, when a building structure was reported as good or excelent there is less chance of having a rodent investation. To quickly interpret the coefficient in the probability scale, we divide by 4: $\frac{-0.94}{4} = -23.5\%$
+* `foreign`: at the mean level of all other predictors, foreign-born owners tends possess apartments located in building $\frac{0.20}{4} = 5\%$ more likely to be infestated by rats.
+
+### For the second part of this problem use the variables in the dataset to develop a good logistic regression model. Make sure to carefully explain what your final model means and check its fit using diagnostics. Make an ROC plot and a calibration curve.
+
+```{r results='asis', echo=FALSE, warning=FALSE}
+
+
+
+```
+
+```{r results='asis', echo=FALSE, warning=FALSE}
+
+glm_link_scores <- predict(m2, df, type="link")
+
+glm_response_scores <- predict(m2, df, type="response")
+
+score_data <- data.frame(link=glm_link_scores, 
+                         response=glm_response_scores,
+                         rodent2=df$rodent2,
+                         stringsAsFactors=FALSE)
+
+score_data %>% 
+  ggplot(aes(x=link, y=response)) + 
+  scale_color_manual(values=c("black", "red")) + 
+  geom_point() + 
+  geom_rug() + 
+  ggtitle("Both link and response scores put cases in the same order")
+
+```
+
+### ROC
+Receiver Operating Characteristics Curve traces the percentage of true positives accurately predicted by a given logit model as the prediction probability cutoff is lowered from 1 to 0. For a good model, as the cutoff is lowered, it should mark more of actual 1’s as positives and lesser of actual 0’s as 1’s. So for a good model, the curve should rise steeply, indicating that the TPR (Y-Axis) increases faster than the FPR (X-Axis) as the cutoff score decreases. Greater the area under the ROC curve, better the predictive ability of the model.
+
+```{r results='asis', echo=FALSE, warning=FALSE}
+
+
+plot(Roc(list("M1"=m1,"m2"=m2)),legend=TRUE,auc=TRUE)
+
+
+```
+
+### Multicollinearity Diagnosis
+Like in case of linear regression, we should check for multicollinearity in the model. As seen below, all X variables in the model have VIF well below 4.
+```{r results='asis', echo=FALSE, warning=FALSE}
+
+vif(m2)
+
+```
+
+### Specificity and Sensitivity
+Sensitivity (or True Positive Rate) is the percentage of 1’s (actuals) correctly predicted by the model, while, specificity is the percentage of 0’s (actuals) correctly predicted. Specificity can also be calculated as 1-False Positive Rate.
+
+The above numbers are calculated on the validation sample that was not used for training the model. So, a truth detection rate of 31% on test data is good.
+```{r echo=FALSE, warning=FALSE}
+threshold=0.5
+predicted_values<-ifelse(predict(m2,df,type="response")>threshold,1,0)
+actual_values<-df$rodent2
+#conf_matrix<-table(predicted_values,actual_values)
+#conf_matrix
+
+
+#Sensitivity(actual_values,predicted_values,threshold)
+#Specificity(actual_values,predicted_values,threshold)
+
+
+```
+
+### Concordance
+Ideally, the model-calculated-probability-scores of all actual Positive’s, (aka Ones) should be greater than the model-calculated-probability-scores of ALL the Negatives (aka Zeroes). Such a model is said to be perfectly concordant and a highly reliable one. This phenomenon can be measured by Concordance and Discordance.
+
+In simpler words, of all combinations of 1-0 pairs (actuals), Concordance is the percentage of pairs, whose scores of actual positive’s are greater than the scores of actual negative’s. For a perfect model, this will be 100%. So, the higher the concordance, the better is the quality of model.
+```{r results='asis', echo=FALSE, warning=FALSE}
+
+#Concordance(df$rodent2, predict(m2,type="response"))
+
+lgfit <- lrm( rodent2 ~ personrm + unitflr2 + regext + totincom2 + extflr5_2 + 
+    intcrack2 + inthole2 + intleak2 + struct + help + black_Mean + 
+    help_Mean + hispanic_Mean + old_Mean + regext_Mean + dilap_Mean + 
+    intcrack2_Mean, data=df, x=TRUE, y=TRUE)
+
+# exp(final.fit$coefficients)
+summary(m2)
+plot(calibrate(lgfit), main="Calibration Curve")
+# The plot provides some evidence that our models is overfitting: the model underestimates low probabilities and overestimates high probabilities. There is also a systematic overestimation around 0.3.
+
+
+```
+
+
+\onecolumn
+
+# Question 4: The full dehydration outcome for the Dhaka study that we looked at in class is a three-level variable (none, some or severe). Build two proportional odds regression models for this three-level variable. In the first use the clinical signs only. In the second, add in the additional predictors. Keep variables that you feel are important to prediction and to interpretation. Interpret your results clearly.
+
+### Model with all Clinical Variables: 
+- genapp
+- tears
+- skin
+- resp
+- thirst
+- eyes
+
+
+```{r results='asis', echo=FALSE, warning=FALSE}
+dhaka=read.csv("data/dhaka.csv")
+colnames(dhaka)
+dhaka$dehyd = factor(dhaka$dehyd)
+dhaka$genapp = factor(dhaka$genapp)
+dhaka$tears = factor(dhaka$tears)
+dhaka$skin = factor(dhaka$skin)
+dhaka$resp = factor(dhaka$resp)
+dhaka$thirst = factor(dhaka$thirst)
+dhaka$eyes = factor(dhaka$eyes)
+dhaka$capref=factor(dhaka$capref)
+dhaka$extrem=factor(dhaka$extrem)
+dhaka$heart=factor(dhaka$heart)
+dhaka$mucous=factor(dhaka$mucous)
+dhaka$pulse=factor(dhaka$pulse)
+dhaka$urine=factor(dhaka$urine)
+
+
+dhaka.clinical.model<- vglm(ordered(dehyd) ~ genapp+tears+skin+resp+thirst+eyes+heart+mucous+pulse+urine ,family=cumulative(parallel=TRUE),data=dhaka)
+summary(dhaka.clinical.model)
+
+
+```
+
+### Significant Clinical Variables: 
+- genapp
+- tears
+- skin
+- resp
+- thirst
+- eyes
+- pulse
+
+```{r results='asis', echo=FALSE, warning=FALSE}
+
+
+dhaka.clinical.model<- vglm(ordered(dehyd) ~ genapp+tears+skin+resp+thirst+eyes+heart+mucous+pulse+urine ,family=cumulative(parallel=TRUE),data=dhaka)
+summary(dhaka.clinical.model)
+
+dhaka.all.model<- vglm(ordered(dehyd)~. ,family=cumulative(parallel=TRUE),data=dhaka)
+summary(dhaka.all.model)
+
+```
+
+### Best Model with both clinical and non clinical variables: 
+- genapp
+- tears
+- skin
+- resp
+- thirst
+- eyes
+- pulse
+
+- we checked for interraction between tears and eyes, thirst and urine, 
+
+```{r results='asis', echo=FALSE, warning=FALSE}
+
+#none some server
+colnames(dhaka)
+dhaka.best.model<- vglm(ordered(dehyd)~genapp+tears+resp+skin+eyes+ pulse+daysofdiar+episodes, family=cumulative(parallel=TRUE),data=dhaka)
+
+summary(dhaka.best.model)
+
+ fit3<- vglm(ordered(dehyd) ~ . - resp -mucous - capref - thirst - agedays - heart - extrem - height - muac - urine -female,family=cumulative(parallel=TRUE), dhaka)
+summary(fit3)
+
+```
+
+### Interpretation
+
+* `Intercept1` 
+ holding the other variable constant, 
+
+* `Intercept2`
+#none vs some vs server
+Holding the othert variables constant at 0, the odds of having server dehidrtaion is 5 times the odds of having no dehidration
+
+its much greater than no dehyration
+
+* `genapp`
+Holding the other variables constant at 0 the odds 
+
+* `tears`
+
+* `skin`
+
+* `eyes`
+- 
+
+* `pulse`
+
+* `daysofdiar`
+
+* `episodes`
+
+\onecolumn
+
+# Source Code
+
+```{r echo=T}
+
+```
