@@ -18,4 +18,4 @@ lmq <-function(x,y){
 x = rep(seq(1,3,by=0.5),2000)
 y = 1 + 2*x + rnorm(length(x),0,1*x^1)
 
-lmq(x,y)
+lmq(x,y)    
