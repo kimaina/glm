@@ -1,0 +1,306 @@
+---
+title: "Homework 6"
+author: "Allan Kimaina"
+header-includes:
+- \usepackage{pdflscape}
+- \newcommand{\blandscape}{\begin{landscape}}
+- \newcommand{\elandscape}{\end{landscape}}
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F)
+
+# loadl lm  package
+library(plyr)
+library(dplyr)
+library("tibble")
+library(car)
+library(sjPlot)
+library(sjmisc)
+library(sjlabelled)
+library(ggpubr)
+library(ggpmisc)
+library(gridExtra)
+library(stargazer)
+library(e1071)
+library(jtools)
+library(effects)
+library(multcompView)
+library(ggplot2)
+library(ggrepel)
+library(MASS)
+library(broom)
+library(ggcorrplot)
+library(leaps)
+library(relaimpo)
+library(olsrr)
+
+# aestetics
+library(xtable)# latex table
+library(texreg) # for latex table
+
+# load GLM packages
+library(ROCR)
+library(arm)
+library(foreign)
+library(nnet)
+library(VGAM)
+library(ordinal)
+library(ModelGood)
+library(InformationValue)
+library(rms)
+library(AER) # for overdispersion
+library(metRology)
+library(hett)
+library(lme4)
+
+
+
+
+# load required data
+riskyBehaviours.df=read.csv("data/risky_behaviors.csv")
+# risk behaviour
+riskyBehaviours.df$couples <- factor(riskyBehaviours.df$couples)
+riskyBehaviours.df$women_alone <- factor(riskyBehaviours.df$women_alone)
+
+riskyBehaviours.df$cBupacts <- (riskyBehaviours.df$bupacts - mean(riskyBehaviours.df$bupacts)) / (2 * sd(riskyBehaviours.df$bupacts))
+
+# cdf
+# load required data
+cd4.df=read.csv("data/cd4.csv")
+cd4.df$newpid= as.character(cd4.df$newpid)
+cd4.df$treatmnt= as.factor(cd4.df$treatmnt)
+
+# transfrom data
+time<-cd4.df$visage-cd4.df$baseage
+cd4.df<-cbind(cd4.df,time)
+
+```
+
+\onecolumn
+
+# Chapter 13 Question 5: 
+**Return to the CD4 data introduced from Exercise 11.4.**
+
+## Part A:
+``Extend the model in Exercise 12.2 to allow for varying slopes for the time predictor.``
+
+```{r results='asis', echo=FALSE, warning=FALSE}
+model_chap12_q2a = lmer(cd4pct~1+time+(1|newpid),data=cd4.df,REML=F) # varying intercepts
+
+texreg(list(model_chap12_q2a), 
+       custom.model.names = c("Model 12.2 A"),
+       single.row=TRUE,  float.pos = "h")
+#summary(model_chap12_q2a)
+#coef(model_chap12_q2a)
+
+```
+
+
+
+## Part B:
+`` Next ﬁt a model that does not allow for varying slopes but does allow for diﬀerent coeﬃcients for each time point (rather than ﬁtting the linear trend)``
+
+```{r results='asis', echo=FALSE, warning=FALSE}
+#model_chap12_q2b=lmer(cd4pct~1+time+(1+treatmnt+baseage|newpid),data=cd4.df,REML=F) 
+model_chap12_q2b=lmer(cd4pct~1+time+treatmnt+baseage+(1|newpid),data=cd4.df,REML=F) 
+
+
+
+texreg(list(model_chap12_q2b), 
+       custom.model.names = c("Model 12.2 B"),
+       single.row=TRUE,  float.pos = "h")
+#summary(model_chap12_q2b)
+#coef(model_chap12_q2b)
+#toLatex(mtable(model_chap12_q2b))
+```
+
+
+
+## Part C:
+`` Compare the results of these models both numerically and graphically.``
+
+
+
+
+### Graphically
+
+```{r results='asis', echo=FALSE, warning=FALSE}
+
+# complete pooling
+complete_pooling.fit<-lm(cd4pct~time, data=cd4.df)
+
+df_complete_pooling <- data_frame(
+  model = "Complete pooling",
+  newpid = unique(cd4.df$newpid),
+  intercept = coef(complete_pooling.fit)[1], 
+  slope_time = coef(complete_pooling.fit)[2])
+
+
+
+# model for question 2 A
+df = coef(model_chap12_q2a)[["newpid"]]
+df$intercept = df$'(Intercept)'
+df_chap12_q2a <- df %>% 
+   dplyr::select(intercept, slope_time = time)  %>% 
+  as_tibble() %>% 
+   rownames_to_column("newpid") %>% 
+  add_column(model = "Model 12.2 A")
+
+
+# model for question 2 B
+df = coef(model_chap12_q2b)[["newpid"]]
+df$intercept = df$'(Intercept)'
+df_chap12_q2b <- df %>% 
+   dplyr::select(intercept, 
+         slope_time = time,
+         treatmnt_slope= treatmnt2, baseage_slope= baseage )  %>% 
+  as_tibble() %>% 
+   rownames_to_column("newpid") %>% 
+  add_column(model = "Model 12.2 B")
+
+
+# bind data
+df_models <- bind_rows(df_chap12_q2a, df_chap12_q2b, df_complete_pooling) %>% 
+  left_join(cd4.df, by = "newpid")
+
+# create subset
+subset <- c(67,72,77,78,79,11,12,19,27,23,62,63)
+
+# construct plot
+model_comparison <- ggplot(df_models[df_models$newpid %in% subset,]) + 
+  aes(x = time, y = cd4pct) + 
+  geom_abline(aes(intercept = intercept, slope = slope_time, color = model),
+              size = .75) + 
+   #theme_bw()+
+    #geom_line( linetype=6)+
+    geom_point()+
+  facet_wrap("newpid") +
+  labs(y = "CD4 Percentage", x="Time (visit_age - base_Age) ")+
+  scale_x_continuous(breaks = 0:4 * 2) + 
+  scale_color_brewer(palette = "Dark2") + 
+  theme(legend.position = "top")
+
+model_comparison
+
+```
+
+
+A few observation to make.
+
+* From the plot, observe that the partial pooling model with added child-level predictors (Model 12.2B)  is pulled substantially towards the complete pooling model (group average) compared to  Model 12.2.A
+
+* If you take a look at children with less observations (incomplete data), you will notice that Model 12.2.B is pulled more towards the complete pooling model (group average) compared to  Model 12.2.A. See child 67, 79, 77
+
+
+### Numerically
+```{r results='asis', echo=FALSE, warning=FALSE}
+
+anova_mixd <- anova(model_chap12_q2a,model_chap12_q2b)
+xtable(anova_mixd, comment=FALSE)
+```
+
+Using ANOVA to check the changes between the 2 models, we find out that adding additional child-level predictors actually reduced the residual sum of squares . This reduction was  statistically significant. We also had lower AIC and BIC in the second model implying that the additional regressors actually improved the model
+
+
+
+```{r results='asis', echo=FALSE, warning=FALSE}
+#coef(model_chap12_q2a)
+q2a_plot <- as.data.frame(lme4::ranef(model_chap12_q2a,condVar=T)) %>%
+    ggplot(aes(y=grp,x=condval))+
+    geom_point()+facet_wrap(~term,scales="free_x")+
+    geom_errorbarh(aes(xmin=condval-2*condsd,xmax=condval+2*condsd),height=0)+
+   labs(x="Random Effects", y="Children") +
+      theme_classic()+ 
+      guides(fill=FALSE) +
+   ggtitle("Model 12.2 A")
+
+q2b_plot <-  as.data.frame(lme4::ranef(model_chap12_q2b,condVar=T)) %>%
+    ggplot(aes(y=grp,x=condval))+
+    geom_point()+facet_wrap(~term,scales="free_x")+
+    geom_errorbarh(aes(xmin=condval-2*condsd,xmax=condval+2*condsd),height=0)+
+    labs(x="Random Effects", y="Children") +
+      theme_classic()+ 
+      guides(fill=FALSE)+
+   ggtitle("Model 12.2 B")
+
+grid.arrange(q2a_plot,q2b_plot, ncol = 2.)
+
+
+```
+
+From the above plot, notice the scale of each plot. Model 12.2.A  has higher random error than Model 12.2.B. This implies that adding child-level predictors reduces the variance of our random effect estimate. We noticed a substantial reduction in the variance of the intercept - 128 to 123. This is mainly because some of the variations had been explained by the addition of fixed effect predictors like base age and treatment.
+
+
+\onecolumn
+
+# Chapter 14 Question 2: 
+**The well-switching data described in Section 5.4 are in the folder arsenic.**
+
+## Part A:
+`` Formulate a multilevel logistic regression model predicting the probability of switching using log distance (to nearest safe well) and arsenic level and allowing intercepts to vary across villages. Fit this model using lmer() and discuss the results.``
+
+```{r results='asis', echo=FALSE, warning=FALSE}
+
+```
+
+
+## Part B:
+``Extend the model in (b) to allow the coeﬃcient on arsenic to vary across village, as well. Fit this model using lmer() and discuss the results. ``
+
+```{r results='asis', echo=FALSE, warning=FALSE}
+
+```
+
+## Part C:
+``Create graphs of the probability of switching wells as a function of arsenic level for eight of the villages.``
+
+```{r results='asis', echo=FALSE, warning=FALSE}
+
+```
+
+## Part D:
+`` Compare the ﬁt of the models in (a) and (b). ``
+
+```{r results='asis', echo=FALSE, warning=FALSE}
+
+```
+
+\onecolumn
+
+# Chapter 14 Question 3: 
+**Three-level logistic regression: the folder rodents contains data on rodents in a sample of New York City apartments.**
+
+## Part A:
+``Build a varying intercept logistic regression model (varying over buildings) to predict the presence of rodents (the variable rodent2 in the dataset) given indicators for the ethnic groups (race) as well as other potentially relevant predictors describing the apartment and building. Fit this model using lmer() and interpret the coeﬃcients at both levels. ``
+
+```{r results='asis', echo=FALSE, warning=FALSE}
+
+```
+
+
+## Part B:
+``Now extend the model in (b) to allow variation across buildings within community district and then across community districts. Also include predictors describing the community districts. Fit this model using lmer() and interpret the coeﬃcients at all levels.``
+
+```{r results='asis', echo=FALSE, warning=FALSE}
+
+```
+
+## Part C:
+`` Compare the ﬁt of the models in (a) and (b).``
+
+```{r results='asis', echo=FALSE, warning=FALSE}
+
+```
+
+\onecolumn
+
+# Source Code
+
+```{r echo=T, warning=F}
+
+
+```
